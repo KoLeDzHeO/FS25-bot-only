@@ -1,0 +1,28 @@
+# Environment files
+.env
+
+# Python bytecode
+__pycache__/
+*.pyc
+
+# Output directories
+output/
+
+# Virtual environment directories
+venv/
+env/
+.venv/
+
+# Editor directories
+.vscode/
+.idea/
+
+# Build directories
+dist/
+build/
+
+# Package info
+*.egg-info/
+
+# Logs
+*.log
