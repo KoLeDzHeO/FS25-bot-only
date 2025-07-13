@@ -30,7 +30,7 @@ import time
 
 
 async def ftp_polling_task(bot: discord.Client) -> None:
-    """Periodically updates the Discord message with server stats."""
+    """Periodically send server stats to Discord every polling interval."""
     log_debug("[TASK] Запущен ftp_polling_task")
     await bot.wait_until_ready()
     channel = await bot.fetch_channel(config.channel_id)
@@ -125,20 +125,6 @@ async def ftp_polling_task(bot: discord.Client) -> None:
                         last_play_time_check = now
 
                 new_day_time = data.get("day_time")
-                last_day_time = None
-                if last_snapshot is not None:
-                    try:
-                        last_day_time = json.loads(last_snapshot).get("day_time")
-                    except Exception:
-                        last_day_time = None
-                if (
-                    last_snapshot is not None
-                    and isinstance(last_day_time, int)
-                    and isinstance(new_day_time, int)
-                    and abs(new_day_time - last_day_time) < 900_000
-                ):
-                    await asyncio.sleep(config.ftp_poll_interval)
-                    continue
 
                 embed = build_embed(data)
 
@@ -154,28 +140,26 @@ async def ftp_polling_task(bot: discord.Client) -> None:
                     "play_time": last_play_time_value,
                     "play_time_check": last_play_time_check,
                 }
-                snapshot = json.dumps(snapshot_data, sort_keys=True)
+                last_snapshot = json.dumps(snapshot_data, sort_keys=True)
 
-                if snapshot != last_snapshot:
-                    last_snapshot = snapshot
-                    file = discord.File(
-                        image_path, filename=ONLINE_DAILY_GRAPH_FILENAME
-                    )
+                file = discord.File(
+                    image_path, filename=ONLINE_DAILY_GRAPH_FILENAME
+                )
 
-                    async for msg in channel.history(
-                        limit=config.message_cleanup_limit
-                    ):
-                        if msg.author == bot.user:
-                            log_debug(f"[Discord] Удаляем сообщение {msg.id}")
-                            try:
-                                await msg.delete()
-                            except Exception as e:
-                                log_debug(
-                                    f"[Discord] Не удалось удалить сообщение: {e}"
-                                )
+                async for msg in channel.history(
+                    limit=config.message_cleanup_limit
+                ):
+                    if msg.author == bot.user:
+                        log_debug(f"[Discord] Удаляем сообщение {msg.id}")
+                        try:
+                            await msg.delete()
+                        except Exception as e:
+                            log_debug(
+                                f"[Discord] Не удалось удалить сообщение: {e}"
+                            )
 
-                    log_debug("[Discord] Отправляем сообщение")
-                    await channel.send(embed=embed, files=[file])
+                log_debug("[Discord] Отправляем сообщение")
+                await channel.send(embed=embed, files=[file])
 
                 await asyncio.sleep(config.ftp_poll_interval)
             except asyncio.CancelledError:

@@ -18,7 +18,8 @@
 - `DISCORD_TOKEN` — токен Discord-бота
 - `DISCORD_CHANNEL_ID` — ID канала для обновления сообщения
 - `API_POLL_INTERVAL` — интервал опроса API (сек)
-- `FTP_POLL_INTERVAL` — интервал опроса FTP (сек)
+- `FTP_POLL_INTERVAL` — интервал опроса FTP (сек). Сообщение обновляется
+  каждый раз при выполнении этого цикла.
 - `API_BASE_URL` — базовый URL API
 - `API_SECRET_CODE` — секретный код API
 - `FTP_HOST` — адрес FTP-сервера
