@@ -197,13 +197,11 @@ async def save_online_history_task(bot: discord.Client) -> None:
             try:
                 now = get_moscow_datetime()
                 minute = now.minute
-
-                wait_seconds = (step - (minute % step)) * 60 - now.second
-                if wait_seconds <= 0:
-                    wait_seconds = 1
+                log_debug(f"[ONLINE] Текущее время: {now.strftime('%Y-%m-%d %H:%M:%S')}")
 
                 if minute % step == 0:
                     start_min = now.replace(second=0, microsecond=0)
+                    log_debug("[ONLINE] Приступаем к сохранению среза")
                     try:
                         exists = await bot.db_pool.fetchval(
                             "SELECT 1 FROM player_online_history WHERE check_time >= $1 AND check_time < $2 LIMIT 1",
@@ -217,10 +215,9 @@ async def save_online_history_task(bot: discord.Client) -> None:
                     if exists:
                         log_debug("[ONLINE] Срез уже был, пропускаем")
                     else:
-                        log_debug("[ONLINE] Время среза, получаем список игроков")
                         xml = await fetch_dedicated_server_stats_cached(session)
                         players = parse_players_online(xml) if xml else []
-                        log_debug(f"[ONLINE] Игроков онлайн: {len(players)}")
+                        log_debug(f"[ONLINE] Игроки онлайн: {players}")
                         records = [(name, now) for name in players]
                         if records:
                             try:
@@ -234,9 +231,17 @@ async def save_online_history_task(bot: discord.Client) -> None:
                                     """,
                                     records,
                                 )
+                                log_debug(f"[DB] Добавлено записей: {len(records)}")
                             except Exception as db_e:
                                 log_debug(f"[DB] Ошибка записи игрока: {db_e}")
 
+                next_slice = (
+                    now.replace(second=0, microsecond=0)
+                    + timedelta(minutes=step - (now.minute % step))
+                )
+                wait_seconds = (next_slice - get_moscow_datetime()).total_seconds()
+                if wait_seconds <= 0:
+                    wait_seconds = 1
                 log_debug(f"[ONLINE] Ждём {wait_seconds} секунд до следующего среза")
                 await asyncio.sleep(wait_seconds)
             except asyncio.CancelledError:
