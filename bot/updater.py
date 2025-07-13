@@ -218,7 +218,9 @@ async def save_online_history_task(bot: discord.Client) -> None:
                         xml = await fetch_dedicated_server_stats_cached(session)
                         players = parse_players_online(xml) if xml else []
                         log_debug(f"[ONLINE] Игроки онлайн: {players}")
-                        records = [(name, now) for name in players]
+                        records = [
+                            (name, now.replace(tzinfo=None)) for name in players
+                        ]
                         if records:
                             try:
                                 await bot.db_pool.executemany(
