@@ -22,11 +22,11 @@ async def fetch_daily_online_counts(db_pool) -> List[int]:
     try:
         rows = await db_pool.fetch(
             """
-            SELECT EXTRACT(HOUR FROM check_time) AS hour,
+            SELECT COALESCE(hour, EXTRACT(HOUR FROM check_time)) AS hour,
                    COUNT(DISTINCT player_name) AS count
             FROM player_online_history
             WHERE check_time >= $1
-            GROUP BY EXTRACT(HOUR FROM check_time)
+            GROUP BY COALESCE(hour, EXTRACT(HOUR FROM check_time))
             ORDER BY hour
             """,
             start,
