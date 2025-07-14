@@ -7,7 +7,6 @@ from datetime import timedelta, datetime
 from typing import List, Tuple
 
 from asyncpg import Pool
-from asyncpg.sql import SQL, Identifier
 
 from config.config import (
     WEEKLY_TOP_LIMIT,
@@ -74,27 +73,23 @@ async def archive_weekly_top(
         async with db_pool.acquire() as conn:
             async with conn.transaction():
                 await conn.execute(
-                    SQL(
-                        """
-                        CREATE TABLE IF NOT EXISTS {} (
-                            player_name TEXT PRIMARY KEY,
-                            hours INTEGER NOT NULL
-                        )
-                        """
-                    ).format(Identifier(table_name))
+                    f"""
+                    CREATE TABLE IF NOT EXISTS "{table_name}" (
+                        player_name TEXT PRIMARY KEY,
+                        hours INTEGER NOT NULL
+                    )
+                    """
                 )
                 await conn.execute(
-                    SQL("TRUNCATE TABLE {}" ).format(Identifier(table_name))
+                    f'TRUNCATE TABLE "{table_name}"'
                 )
                 await conn.executemany(
-                    SQL(
-                        """
-                        INSERT INTO {} (player_name, hours)
-                        VALUES ($1, $2)
-                        ON CONFLICT (player_name) DO UPDATE
-                        SET hours = EXCLUDED.hours
-                        """
-                    ).format(Identifier(table_name)),
+                    f"""
+                    INSERT INTO "{table_name}" (player_name, hours)
+                    VALUES ($1, $2)
+                    ON CONFLICT (player_name) DO UPDATE
+                    SET hours = EXCLUDED.hours
+                    """,
                     rows,
                 )
         log_debug("[ARCHIVER] Топ игроков сохранён")
