@@ -12,10 +12,10 @@ CREATE INDEX IF NOT EXISTS idx_online_name_date_hour ON player_online_history (p
 CREATE INDEX IF NOT EXISTS idx_online_check_time ON player_online_history (check_time);
 
 CREATE TABLE IF NOT EXISTS player_total_time (
-    player_name TEXT PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
+    player_name TEXT UNIQUE NOT NULL,
     total_hours INTEGER NOT NULL,
-    updated_at TIMESTAMP NOT NULL,
-    last_timestamp TIMESTAMP NOT NULL DEFAULT 'epoch'
+    updated_at TIMESTAMP NOT NULL
 );
 -- Индекс для сортировки по общему времени
 CREATE INDEX IF NOT EXISTS idx_total_hours ON player_total_time (total_hours DESC);

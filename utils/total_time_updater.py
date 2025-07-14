@@ -11,21 +11,18 @@ from utils.logger import log_debug
 from config.config import config
 
 
-async def _fetch_incremental_hours(
+async def _fetch_total_hours(
     db_pool: Pool,
     *,
     history_table: str = "player_online_history",
-    total_table: str = "player_total_time",
 ) -> List[Tuple[str, int]]:
-    """Return active hours for each player since the stored timestamp."""
+    """Возвращает суммарные часы для каждого игрока."""
     query = f"""
         SELECT player_name, COUNT(*) AS hours
         FROM (
-            SELECT h.player_name, h.date, h.hour
-            FROM {history_table} AS h
-            LEFT JOIN {total_table} AS t ON h.player_name = t.player_name
-            WHERE h.check_time > COALESCE(t.last_timestamp, TIMESTAMP 'epoch')
-            GROUP BY h.player_name, h.date, h.hour
+            SELECT player_name, date, hour
+            FROM {history_table}
+            GROUP BY player_name, date, hour
             HAVING COUNT(*) >= 3
         ) AS s
         GROUP BY player_name
@@ -46,42 +43,36 @@ async def update_total_time(
     history_table: str = "player_online_history",
     total_table: str = "player_total_time",
 ) -> None:
-    """Calculate incremental hours and update the total time table."""
+    """Вычисляет общее время и обновляет таблицу."""
 
     try:
         async with db_pool.acquire() as conn:
             async with conn.transaction():
-                # Создаём таблицу, если её ещё нет (нужен PRIMARY KEY для ON CONFLICT)
+                # Создаём таблицу, если её ещё нет
                 await conn.execute(
                     f"""
                     CREATE TABLE IF NOT EXISTS {total_table} (
-                        player_name TEXT PRIMARY KEY,
+                        id SERIAL PRIMARY KEY,
+                        player_name TEXT UNIQUE NOT NULL,
                         total_hours INTEGER NOT NULL,
-                        updated_at TIMESTAMP NOT NULL,
-                        last_timestamp TIMESTAMP NOT NULL DEFAULT 'epoch'
+                        updated_at TIMESTAMP NOT NULL
                     )
                     """
                 )
-                await conn.execute(
-                    f"ALTER TABLE {total_table} "
-                    "ADD COLUMN IF NOT EXISTS last_timestamp TIMESTAMP NOT NULL DEFAULT 'epoch'"
-                )
 
-                rows = await _fetch_incremental_hours(
+                rows = await _fetch_total_hours(
                     conn,
                     history_table=history_table,
-                    total_table=total_table,
                 )
 
                 if rows:
                     await conn.executemany(
                         f"""
-                        INSERT INTO {total_table} (player_name, total_hours, updated_at, last_timestamp)
-                        VALUES ($1, $2, NOW(), NOW())
+                        INSERT INTO {total_table} (player_name, total_hours, updated_at)
+                        VALUES ($1, $2, NOW())
                         ON CONFLICT (player_name) DO UPDATE
-                            SET total_hours = {total_table}.total_hours + EXCLUDED.total_hours,
-                                updated_at = EXCLUDED.updated_at,
-                                last_timestamp = EXCLUDED.last_timestamp
+                            SET total_hours = EXCLUDED.total_hours,
+                                updated_at = EXCLUDED.updated_at
                         """,
                         rows,
                     )
@@ -89,7 +80,6 @@ async def update_total_time(
                 else:
                     log_debug("[TOTAL] Нет данных для обновления")
 
-                await conn.execute(f"UPDATE {total_table} SET last_timestamp = NOW()")
     except Exception as e:
         log_debug(f"[DB] Error updating total time: {e}")
         raise
