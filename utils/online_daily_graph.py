@@ -24,7 +24,11 @@ async def fetch_daily_online_counts(db_pool) -> List[int]:
         rows = await db_pool.fetch(
             """
             WITH hours AS (
-                SELECT generate_series($1, $1 + interval '23 hours', interval '1 hour') AS hour_start
+                SELECT generate_series(
+                    $1::timestamp,
+                    $1::timestamp + interval '23 hours',
+                    '1 hour'::interval
+                ) AS hour_start
             ),
             slice_counts AS (
                 SELECT date_trunc('hour', check_time) AS hour_start,

@@ -51,6 +51,17 @@ async def update_total_time(
     try:
         async with db_pool.acquire() as conn:
             async with conn.transaction():
+                # Создаём таблицу, если её ещё нет (нужен PRIMARY KEY для ON CONFLICT)
+                await conn.execute(
+                    f"""
+                    CREATE TABLE IF NOT EXISTS {total_table} (
+                        player_name TEXT PRIMARY KEY,
+                        total_hours INTEGER NOT NULL,
+                        updated_at TIMESTAMP NOT NULL,
+                        last_timestamp TIMESTAMP NOT NULL DEFAULT 'epoch'
+                    )
+                    """
+                )
                 await conn.execute(
                     f"ALTER TABLE {total_table} "
                     "ADD COLUMN IF NOT EXISTS last_timestamp TIMESTAMP NOT NULL DEFAULT 'epoch'"
