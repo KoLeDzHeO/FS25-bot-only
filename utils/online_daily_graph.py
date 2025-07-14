@@ -15,27 +15,33 @@ from utils.logger import log_debug
 
 
 async def fetch_daily_online_counts(db_pool) -> List[int]:
-    """Возвращает число уникальных игроков за каждый час последних 24 часов."""
+    """Возвращает максимальный онлайн за каждый час последних 24 часов."""
 
-    now = get_moscow_datetime().replace(minute=0, second=0, microsecond=0)
-    start = now - timedelta(hours=23)
+    now = get_moscow_datetime()
+    start_hour = (now - timedelta(hours=23)).replace(minute=0, second=0, microsecond=0)
 
     try:
         rows = await db_pool.fetch(
             """
             WITH hours AS (
-                SELECT generate_series($1, $2, interval '1 hour') AS hour_start
+                SELECT generate_series($1, $1 + interval '23 hours', interval '1 hour') AS hour_start
+            ),
+            slice_counts AS (
+                SELECT date_trunc('hour', check_time) AS hour_start,
+                       check_time,
+                       COUNT(DISTINCT player_name) AS cnt
+                FROM player_online_history
+                WHERE check_time >= $1 AND check_time <= $2
+                GROUP BY hour_start, check_time
             )
-            SELECT h.hour_start AS hour,
-                   COUNT(DISTINCT p.player_name) AS count
+            SELECT h.hour_start,
+                   COALESCE(MAX(s.cnt), 0) AS count
             FROM hours h
-            LEFT JOIN player_online_history p
-                   ON p.check_time >= h.hour_start
-                  AND p.check_time < h.hour_start + interval '1 hour'
+            LEFT JOIN slice_counts s ON s.hour_start = h.hour_start
             GROUP BY h.hour_start
             ORDER BY h.hour_start
             """,
-            start,
+            start_hour,
             now,
         )
     except Exception as e:
@@ -48,8 +54,8 @@ async def fetch_daily_online_counts(db_pool) -> List[int]:
 def save_daily_online_graph(counts: List[int]) -> str:
     """Сохраняет PNG-график количества игроков за последние 24 часа."""
 
-    now = get_moscow_datetime().replace(minute=0, second=0, microsecond=0)
-    start = now - timedelta(hours=len(counts) - 1)
+    now = get_moscow_datetime()
+    start = (now - timedelta(hours=len(counts) - 1)).replace(minute=0, second=0, microsecond=0)
     hours = [(start + timedelta(hours=i)).hour for i in range(len(counts))]
 
     plt.figure(figsize=(10, 3))
