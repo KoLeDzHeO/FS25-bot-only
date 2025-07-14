@@ -15,42 +15,45 @@ from utils.logger import log_debug
 
 
 async def fetch_daily_online_counts(db_pool) -> List[int]:
-    """Возвращает число уникальных игроков по часам за последние 24 часа."""
+    """Возвращает число уникальных игроков за каждый час последних 24 часов."""
 
-    start = get_moscow_datetime() - timedelta(hours=24)
+    now = get_moscow_datetime().replace(minute=0, second=0, microsecond=0)
+    start = now - timedelta(hours=23)
 
     try:
         rows = await db_pool.fetch(
             """
-            SELECT COALESCE(hour, EXTRACT(HOUR FROM check_time)) AS hour,
-                   COUNT(DISTINCT player_name) AS count
-            FROM player_online_history
-            WHERE check_time >= $1
-            GROUP BY COALESCE(hour, EXTRACT(HOUR FROM check_time))
-            ORDER BY hour
+            WITH hours AS (
+                SELECT generate_series($1, $2, interval '1 hour') AS hour_start
+            )
+            SELECT h.hour_start AS hour,
+                   COUNT(DISTINCT p.player_name) AS count
+            FROM hours h
+            LEFT JOIN player_online_history p
+                   ON p.check_time >= h.hour_start
+                  AND p.check_time < h.hour_start + interval '1 hour'
+            GROUP BY h.hour_start
+            ORDER BY h.hour_start
             """,
             start,
+            now,
         )
     except Exception as e:
         log_debug(f"[DB] Error fetching online day data: {e}")
         raise
 
-    counts = [0] * 24
-    for row in rows:
-        counts[int(row["hour"])] = row["count"]
-
-    return counts
+    return [row["count"] for row in rows]
 
 
 def save_daily_online_graph(counts: List[int]) -> str:
     """Сохраняет PNG-график количества игроков за последние 24 часа."""
 
-    now_hour = get_moscow_datetime().hour
-    hours = list(range(now_hour + 1, 24)) + list(range(0, now_hour + 1))
-    rotated = counts[now_hour + 1 :] + counts[: now_hour + 1]
+    now = get_moscow_datetime().replace(minute=0, second=0, microsecond=0)
+    start = now - timedelta(hours=len(counts) - 1)
+    hours = [(start + timedelta(hours=i)).hour for i in range(len(counts))]
 
     plt.figure(figsize=(10, 3))
-    plt.bar(range(len(rotated)), rotated, color="tab:blue")
+    plt.bar(range(len(counts)), counts, color="tab:blue")
 
     plt.xticks(ticks=range(len(hours)), labels=hours)
     plt.xlim(-0.5, len(hours) - 0.5)
@@ -59,7 +62,7 @@ def save_daily_online_graph(counts: List[int]) -> str:
     plt.ylabel("Игроки")
     plt.title(ONLINE_DAILY_GRAPH_TITLE)
 
-    max_val = max(rotated) if rotated else 0
+    max_val = max(counts) if counts else 0
     tick_count = max(max_val + 1, 6)
     plt.yticks(range(tick_count))
 
