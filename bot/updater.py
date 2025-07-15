@@ -245,10 +245,10 @@ async def cleanup_old_online_history_task(bot: discord.Client) -> None:
     while not bot.is_closed():
         try:
             log_debug("[DB] Удаляем старые записи из player_online_history")
+            cutoff = get_moscow_datetime() - timedelta(days=cleanup_history_days)
             await bot.db_pool.execute(
-                "DELETE FROM player_online_history "
-                "WHERE check_time < NOW() - $1 * INTERVAL '1 day'",
-                cleanup_history_days,
+                "DELETE FROM player_online_history WHERE check_time < $1",
+                cutoff,
             )
             await asyncio.sleep(cleanup_task_interval_seconds)
         except asyncio.CancelledError:
