@@ -26,7 +26,7 @@ class Config:
     postgres_url: str = os.getenv("POSTGRES_URL", "")
 
     ftp_profile_dir: str = os.getenv("FTP_PROFILE_DIR", "1377415")
-    ftp_savegame_dir: str = os.getenv("FTP_SAVEGAME_DIR", "config/savegame1")
+    ftp_savegame_dir: str = os.getenv("FTP_SAVEGAME_DIR", "config/savegame2")
     timezone_offset: int = int(os.getenv("TIMEZONE_OFFSET", 3))
     output_dir: Path = Path(os.getenv("OUTPUT_DIR", "output"))
 
