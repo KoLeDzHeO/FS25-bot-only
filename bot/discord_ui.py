@@ -81,7 +81,7 @@ def build_embed(data: Dict[str, Any]) -> discord.Embed:
     # Текст embed'a формируем единой строкой
     lines = [
         data.get("server_status", "—"),
-        f"🧷 **Сервер:** {server_name}",
+        f"🧷 **Сервер:** ![BANDA] banda-farm.ru! ", #{server_name}
         f"🗺️ **Карта:** {map_name}",
         f"🕒 **Время в игре:** {time_str} ({scale_str})",
     ]
