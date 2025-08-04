@@ -71,7 +71,7 @@ async def update_total_time(
                         INSERT INTO {total_table} (player_name, total_hours, updated_at)
                         VALUES ($1, $2, NOW())
                         ON CONFLICT (player_name) DO UPDATE
-                            SET total_hours = EXCLUDED.total_hours,
+                            SET total_hours = GREATEST(player_total_time.total_hours, EXCLUDED.total_hours),
                                 updated_at = EXCLUDED.updated_at
                         """,
                         rows,
