@@ -19,17 +19,17 @@ async def fetch_players(pool: Pool) -> List[Tuple[str, float, datetime]]:
         rows = await pool.fetch(
             """
             SELECT player_name AS nickname,
-                   total_time,
+                   total_hours,
                    updated_at AS last_seen
-            FROM players
-            ORDER BY total_time DESC;
+            FROM player_total_time
+            ORDER BY total_hours DESC;
             """
         )
     except Exception as e:
         log_debug(f"[DB] export_excel fetch error: {e}")
         raise
     return [
-        (r["nickname"], float(r["total_time"]), r["last_seen"])
+        (r["nickname"], float(r["total_hours"]), r["last_seen"])
         for r in rows
     ]
 
