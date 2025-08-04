@@ -14,7 +14,8 @@ CREATE INDEX IF NOT EXISTS idx_online_check_time ON player_online_history (check
 CREATE TABLE IF NOT EXISTS player_total_time (
     id SERIAL PRIMARY KEY,
     player_name TEXT UNIQUE NOT NULL,
-    total_hours INTEGER NOT NULL,
+    total_hours INTEGER NOT NULL DEFAULT 0,
+    last_processed_at TIMESTAMP NOT NULL DEFAULT '2000-01-01 00:00:00',
     updated_at TIMESTAMP NOT NULL
 );
 -- Индекс для сортировки по общему времени
