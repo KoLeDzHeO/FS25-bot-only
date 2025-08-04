@@ -9,6 +9,7 @@ import discord
 from discord import app_commands
 from asyncpg import Pool
 from openpyxl import Workbook
+from openpyxl.styles import Alignment
 
 from utils.logger import log_debug
 
@@ -51,13 +52,14 @@ async def _handle_command(interaction: discord.Interaction) -> None:
         wb = Workbook()
         ws = wb.active
         ws.title = "Players"
-        ws.append(["Никнейм", "Общее время (ч)", "Последнее появление"])
+        ws.append(["Никнейм", "Общее время (ч)"])
         ws.column_dimensions["A"].width = 25
         ws.column_dimensions["B"].width = 15
-        ws.column_dimensions["C"].width = 30
-        date_fmt = "%d.%m.%Y %H:%M:%S"
-        for nickname, total_time, last_seen in players:
-            ws.append([nickname, total_time, last_seen.strftime(date_fmt)])
+        for nickname, total_time, _ in players:
+            ws.append([nickname, total_time])
+
+        for row in ws.iter_rows(min_row=2, max_col=2, max_row=ws.max_row):
+            row[1].alignment = Alignment(horizontal="center")
 
         buffer = io.BytesIO()
         wb.save(buffer)
