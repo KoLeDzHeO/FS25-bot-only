@@ -3,38 +3,11 @@
 from __future__ import annotations
 
 import asyncio
-from typing import List, Tuple
 
 from asyncpg import Pool
 
 from utils.logger import log_debug
 from config.config import config
-
-
-async def _fetch_total_hours(
-    db_pool: Pool,
-    *,
-    history_table: str = "player_online_history",
-) -> List[Tuple[str, int]]:
-    """Возвращает суммарные часы для каждого игрока."""
-    query = f"""
-        SELECT player_name, COUNT(*) AS hours
-        FROM (
-            SELECT player_name, date, hour
-            FROM {history_table}
-            GROUP BY player_name, date, hour
-            HAVING COUNT(*) >= 3
-        ) AS s
-        GROUP BY player_name
-        ORDER BY player_name
-    """
-    try:
-        rows = await db_pool.fetch(query)
-    except Exception as e:
-        log_debug(f"[DB] Error fetching incremental hours: {e}")
-        raise
-
-    return [(r["player_name"], int(r["hours"])) for r in rows]
 
 
 async def update_total_time(
@@ -43,7 +16,7 @@ async def update_total_time(
     history_table: str = "player_online_history",
     total_table: str = "player_total_time",
 ) -> None:
-    """Вычисляет общее время и обновляет таблицу."""
+    """Добавляет игрокам только новые часы из истории."""
 
     try:
         async with db_pool.acquire() as conn:
@@ -54,29 +27,76 @@ async def update_total_time(
                     CREATE TABLE IF NOT EXISTS {total_table} (
                         id SERIAL PRIMARY KEY,
                         player_name TEXT UNIQUE NOT NULL,
-                        total_hours INTEGER NOT NULL,
+                        total_hours INTEGER NOT NULL DEFAULT 0,
+                        last_processed_at TIMESTAMP NOT NULL DEFAULT '2000-01-01 00:00:00',
                         updated_at TIMESTAMP NOT NULL
                     )
                     """
                 )
 
-                rows = await _fetch_total_hours(
-                    conn,
-                    history_table=history_table,
+                # Убедимся, что все игроки присутствуют в таблице total_table
+                await conn.execute(
+                    f"""
+                    INSERT INTO {total_table} (player_name, total_hours, last_processed_at, updated_at)
+                    SELECT DISTINCT player_name, 0, NOW(), NOW()
+                    FROM {history_table}
+                    ON CONFLICT (player_name) DO NOTHING
+                    """
                 )
 
-                if rows:
-                    await conn.executemany(
-                        f"""
-                        INSERT INTO {total_table} (player_name, total_hours, updated_at)
-                        VALUES ($1, $2, NOW())
-                        ON CONFLICT (player_name) DO UPDATE
-                            SET total_hours = GREATEST(player_total_time.total_hours, EXCLUDED.total_hours),
-                                updated_at = EXCLUDED.updated_at
-                        """,
-                        rows,
+                # Инициализируем игроков без учтённых часов
+                init_rows = await conn.fetch(
+                    f"""
+                    WITH max_ts AS (
+                        SELECT player_name,
+                               MAX(date::timestamp + hour * INTERVAL '1 hour') AS ts
+                        FROM {history_table}
+                        GROUP BY player_name
                     )
-                    log_debug(f"[TOTAL] Обновлено {len(rows)} записей")
+                    UPDATE {total_table} t
+                    SET last_processed_at = m.ts,
+                        updated_at = NOW()
+                    FROM max_ts m
+                    WHERE t.player_name = m.player_name
+                      AND t.last_processed_at = '2000-01-01 00:00:00'
+                      AND m.ts IS NOT NULL
+                    RETURNING t.player_name
+                    """
+                )
+                if init_rows:
+                    log_debug(f"[TOTAL] Инициализировано {len(init_rows)} игроков")
+
+                # Добавляем только новые часы
+                updated_rows = await conn.fetch(
+                    f"""
+                    WITH hourly AS (
+                        SELECT player_name,
+                               date::timestamp + hour * INTERVAL '1 hour' AS ts
+                        FROM {history_table}
+                        GROUP BY player_name, date, hour
+                        HAVING COUNT(*) >= 3
+                    ),
+                    new_hours AS (
+                        SELECT h.player_name,
+                               COUNT(*) AS hours,
+                               MAX(h.ts) AS max_ts
+                        FROM hourly h
+                        JOIN {total_table} t ON t.player_name = h.player_name
+                        WHERE h.ts > t.last_processed_at
+                          AND t.last_processed_at > '2000-01-01 00:00:00'
+                        GROUP BY h.player_name
+                    )
+                    UPDATE {total_table} t
+                    SET total_hours = t.total_hours + n.hours,
+                        last_processed_at = n.max_ts,
+                        updated_at = NOW()
+                    FROM new_hours n
+                    WHERE t.player_name = n.player_name
+                    RETURNING t.player_name
+                    """
+                )
+                if updated_rows:
+                    log_debug(f"[TOTAL] Обновлено {len(updated_rows)} записей")
                 else:
                     log_debug("[TOTAL] Нет данных для обновления")
 
