@@ -20,6 +20,7 @@ from commands.top7lastweek import setup as setup_top7lastweek
 from commands.top7week import setup as setup_top7week
 from commands.top_total import setup as setup_top_total
 from commands.online_month import setup as setup_online_month
+from commands.export_excel import setup as setup_export_excel
 
 
 def handle_task_exception(task: asyncio.Task) -> None:
@@ -102,6 +103,7 @@ class MyBot(discord.Client):
 
         setup_top_total(self.tree)
         setup_online_month(self.tree)
+        await setup_export_excel(self.tree)
         await self.tree.sync()
         log_debug("[SYNC] Slash-команды успешно синхронизированы")
         log_debug("[Slash] Команды синхронизированы")
