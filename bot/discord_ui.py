@@ -88,8 +88,8 @@ def build_embed(data: Dict[str, Any]) -> discord.Embed:
     if play_time_str:
         lines.append(play_time_str)
     lines += [
-        f"💰 **Деньги фермы:** {money_str}",
-        f"🌾 **Поля во владении:** {fields_str}",
+        f"💰 **Деньги фермы:** Отсутствует доступ к FTP", #{money_str}
+        f"🌾 **Поля во владении:** отсутствует доступ к FTP", #{fields_str}
         f"🚜 **Техника:** {vehicles_str} единиц",
         f"👥 **Слоты:** {slots_str}",
         f"👥 **Онлайн:** {', '.join(players_online) if players_online else 'никого нет'}",
