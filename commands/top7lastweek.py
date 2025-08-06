@@ -7,6 +7,7 @@ from asyncpg import Pool
 
 from config.config import WEEKLY_TOP_LIMIT, WEEKLY_TOP_LAST_TABLE
 from utils.logger import log_debug
+from pause_guard import pause_guard
 
 
 async def _fetch_last_week_top(
@@ -62,6 +63,7 @@ def setup(
     limit: int = WEEKLY_TOP_LIMIT,
 ) -> None:
     @tree.command(name="top7lastweek", description="Топ игроков прошлой недели")
+    @pause_guard
     async def top7lastweek_command(interaction: discord.Interaction) -> None:
         await _handle_command(interaction, table_name=table_name, limit=limit)
 

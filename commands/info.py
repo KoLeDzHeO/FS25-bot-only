@@ -4,6 +4,7 @@ import discord
 from discord import app_commands
 
 from utils.logger import log_debug
+from pause_guard import pause_guard
 
 INFO_TEXT = (
     "\U0001f4ca Информация о боте статистики активности\n"
@@ -38,6 +39,7 @@ INFO_TEXT = (
 
 def setup(tree: app_commands.CommandTree) -> None:
     @tree.command(name="info", description="Информация о том, как работает бот")
+    @pause_guard
     async def info_command(interaction: discord.Interaction) -> None:
         await interaction.response.send_message(INFO_TEXT)
 

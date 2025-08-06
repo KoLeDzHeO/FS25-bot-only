@@ -4,6 +4,7 @@ import discord
 from discord import app_commands
 
 from utils.logger import log_debug
+from pause_guard import pause_guard
 
 
 async def _clear_messages(interaction: discord.Interaction) -> None:
@@ -57,6 +58,7 @@ def setup(tree: app_commands.CommandTree) -> None:
         name="clear_bot_messages",
         description="Удаляет сообщения, отправленные ботом в текущем канале",
     )
+    @pause_guard
     async def clear_bot_messages(interaction: discord.Interaction) -> None:
         await _clear_messages(interaction)
 

@@ -8,6 +8,7 @@ from discord import app_commands
 from config.config import ONLINE_MONTH_GRAPH_TITLE
 from utils.online_month_graph import generate_online_month_graph
 from utils.logger import log_debug
+from pause_guard import pause_guard
 
 
 def setup(tree: app_commands.CommandTree) -> None:
@@ -15,6 +16,7 @@ def setup(tree: app_commands.CommandTree) -> None:
         name="online_month",
         description="График онлайна по дням за последние 30 дней",
     )
+    @pause_guard
     async def online_month_command(interaction: discord.Interaction) -> None:
         await interaction.response.defer()
         try:

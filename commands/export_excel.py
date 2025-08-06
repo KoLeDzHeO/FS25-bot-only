@@ -12,6 +12,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment
 
 from utils.logger import log_debug
+from pause_guard import pause_guard
 
 
 async def fetch_players(pool: Pool) -> List[Tuple[str, float, datetime]]:
@@ -84,6 +85,7 @@ async def _handle_command(interaction: discord.Interaction) -> None:
 
 async def setup(tree: app_commands.CommandTree) -> None:
     @tree.command(name="экспорт_excel", description="Экспорт данных игроков в Excel")
+    @pause_guard
     async def export_excel_command(interaction: discord.Interaction) -> None:
         await _handle_command(interaction)
 

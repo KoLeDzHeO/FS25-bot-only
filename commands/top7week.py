@@ -5,10 +5,12 @@ from discord import app_commands
 
 from utils.weekly_top import generate_weekly_top
 from utils.logger import log_debug
+from pause_guard import pause_guard
 
 
 def setup(tree: app_commands.CommandTree) -> None:
     @tree.command(name="top7week", description="Топ 7 игроков за неделю по часам")
+    @pause_guard
     async def top7week_command(interaction: discord.Interaction) -> None:
         await interaction.response.defer()
         try:
