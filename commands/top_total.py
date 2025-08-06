@@ -6,6 +6,7 @@ from discord import app_commands
 from asyncpg import Pool
 
 from utils.logger import log_debug
+from pause_guard import pause_guard
 from config.config import TOTAL_TOP_LIMIT, TOTAL_TOP_TABLE
 
 
@@ -77,6 +78,7 @@ def setup(
     limit: int = TOTAL_TOP_LIMIT,
 ) -> None:
     @tree.command(name="top_total", description="Топ игроков по общему времени")
+    @pause_guard
     async def top_total_command(interaction: discord.Interaction) -> None:
         await _handle_command(interaction, table_name=table_name, limit=limit)
 
