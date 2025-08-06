@@ -15,6 +15,11 @@ class Config:
 
     discord_token: str = os.getenv("DISCORD_TOKEN", "")
     channel_id: int = int(os.getenv("DISCORD_CHANNEL_ID", 0))
+    bot_paused_mode: bool = os.getenv("BOT_PAUSED_MODE", "false").lower() in {
+        "true",
+        "1",
+        "yes",
+    }
     api_base_url: str = os.getenv("API_BASE_URL", "")
     api_secret_code: str = os.getenv("API_SECRET_CODE", "")
     api_poll_interval: int = int(os.getenv("API_POLL_INTERVAL", 900))

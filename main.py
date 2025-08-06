@@ -14,8 +14,9 @@ from bot.updater import (
 )
 from utils.total_time_updater import total_time_update_task
 from utils.weekly_archiver import weekly_top_archive_task
+from bot.discord_ui import build_paused_embed
 
-from utils.logger import log_debug
+from utils.logger import log_debug, log_info
 from commands.top7lastweek import setup as setup_top7lastweek
 from commands.top7week import setup as setup_top7week
 from commands.top_total import setup as setup_top_total
@@ -75,29 +76,61 @@ class MyBot(discord.Client):
 
     async def setup_hook(self) -> None:
         """Called by discord.py when the client is ready."""
+        log_info("[SETUP] Starting bot setup")
         self.db_pool = await asyncpg.create_pool(dsn=config.postgres_url)
         await self._ensure_indexes()
+        if config.bot_paused_mode:
+            log_info("[SETUP] BOT_PAUSED_MODE enabled - skipping background tasks")
+            channel = await self.fetch_channel(config.channel_id)
+            if channel is None:
+                log_debug("❌ Канал не найден!")
+            else:
+                bot_user = self.user
+                if bot_user and hasattr(channel, "history"):
+                    deleted = 0
+                    try:
+                        async for message in channel.history(limit=None):
+                            if message.author.id == bot_user.id:
+                                try:
+                                    await message.delete()
+                                    deleted += 1
+                                except discord.Forbidden:
+                                    log_debug("[PAUSED] Нет прав на удаление сообщений")
+                                    break
+                                except discord.HTTPException as e:
+                                    log_debug(f"[PAUSED] Ошибка удаления сообщения: {e}")
+                        log_debug(f"[PAUSED] Удалено сообщений: {deleted}")
+                    except discord.Forbidden:
+                        log_debug("[PAUSED] Нет прав на чтение истории сообщений")
+                    except Exception as e:
+                        log_debug(f"[PAUSED] Неожиданная ошибка при удалении сообщений: {e}")
+                else:
+                    log_debug("[PAUSED] Канал не поддерживает историю сообщений")
+                embed = build_paused_embed()
+                await channel.send(embed=embed)
+                log_info("[PAUSED] Отправлено сообщение о недоступности сервера")
+        else:
+            log_info("[SETUP] Starting background tasks")
+            task = asyncio.create_task(ftp_polling_task(self))
+            task.add_done_callback(handle_task_exception)
+            self.tasks.append(task)
 
-        task = asyncio.create_task(ftp_polling_task(self))
-        task.add_done_callback(handle_task_exception)
-        self.tasks.append(task)
+            task = asyncio.create_task(save_online_history_task(self))
+            task.add_done_callback(handle_task_exception)
+            self.tasks.append(task)
 
-        task = asyncio.create_task(save_online_history_task(self))
-        task.add_done_callback(handle_task_exception)
-        self.tasks.append(task)
+            task = asyncio.create_task(cleanup_old_online_history_task(self))
+            task.add_done_callback(handle_task_exception)
+            self.tasks.append(task)
 
-        task = asyncio.create_task(cleanup_old_online_history_task(self))
-        task.add_done_callback(handle_task_exception)
-        self.tasks.append(task)
+            task = asyncio.create_task(total_time_update_task(self))
+            task.add_done_callback(handle_task_exception)
+            self.tasks.append(task)
 
-        task = asyncio.create_task(total_time_update_task(self))
-        task.add_done_callback(handle_task_exception)
-        self.tasks.append(task)
-
-        task = asyncio.create_task(weekly_top_archive_task(self))
-        task.add_done_callback(handle_task_exception)
-        self.tasks.append(task)
-        log_debug("[SETUP] Background tasks started")
+            task = asyncio.create_task(weekly_top_archive_task(self))
+            task.add_done_callback(handle_task_exception)
+            self.tasks.append(task)
+            log_info("[SETUP] Background tasks started")
 
         setup_top7week(self.tree)
 
@@ -114,7 +147,7 @@ class MyBot(discord.Client):
 
     async def on_ready(self) -> None:
         """Log successful authorization."""
-        log_debug(f"Discord-бот авторизован как {self.user}")
+        log_info(f"Discord-бот авторизован как {self.user}")
 
     async def on_message(self, message: discord.Message) -> None:
         """Обрабатывает текстовые сообщения (команды больше не используются)."""
@@ -130,11 +163,11 @@ if __name__ == "__main__":
 
     bot = MyBot(intents=intents)
 
-    log_debug("Запускаем Discord-бота")
+    log_info("Запускаем Discord-бота")
     try:
         bot.run(config.discord_token)
     except KeyboardInterrupt:
-        log_debug("[MAIN] Прерывание, останавливаем бота")
+        log_info("[MAIN] Прерывание, останавливаем бота")
         asyncio.run(bot.close())
     finally:
-        log_debug("Discord-бот остановлен")
+        log_info("Discord-бот остановлен")
